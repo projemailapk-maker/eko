@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "19678484625",
+    "project_id": "carpetqr",
+    "storage_bucket": "carpetqr.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:19678484625:android:47a8c5ec2754d3939bc730",
+        "android_client_info": {
+          "package_name": "com.carpetqr.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhWxWOI1St9k6dY2JFQGsbn6l-_NuaEhk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
