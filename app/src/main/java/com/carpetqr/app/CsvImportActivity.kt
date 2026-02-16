@@ -54,9 +54,16 @@ class CsvImportActivity : AppCompatActivity() {
             }
 
             // Header: #;ID;CINS;CARPET_NAME;QR_TEXT;...;IMAGE_URL
-            val header = lines.first().trim()
-            if (!header.contains("ID") || !header.contains("IMAGE_URL")) {
+            val headerLine = lines.first().trim()
+            if (!headerLine.contains("ID") || !headerLine.contains("IMAGE_URL")) {
                 txtStatus.text = "CSV başlık satırı beklenenden farklı"
+                return
+            }
+
+            val headers = headerLine.split(';').map { it.trim() }
+            val idIndex = headers.indexOf("ID")
+            if (idIndex == -1) {
+                txtStatus.text = "CSV'de ID sütunu yok"
                 return
             }
 
@@ -64,76 +71,65 @@ class CsvImportActivity : AppCompatActivity() {
             var successCount = 0
             var failCount = 0
 
-            // Basit batch yaklaşımı (500 sınırı). Bu örnek dosyada 20 kayıt var.
-            var batch = db.batch()
-            var inBatch = 0
-
-            fun commitBatch(onDone: () -> Unit) {
-                if (inBatch == 0) {
-                    onDone()
-                    return
-                }
-                batch.commit()
-                    .addOnSuccessListener { onDone() }
-                    .addOnFailureListener { e ->
-                        Log.e("CarpetQR", "Batch commit failed", e)
-                        Toast.makeText(this, "Yükleme hatası: ${e.message}", Toast.LENGTH_LONG).show()
-                        onDone()
-                    }
-            }
+            // Batch (500 limit) - tek seferde commit edeceğiz (şimdilik küçük dosyalar için)
+            val batch = db.batch()
 
             // skip header
             val dataLines = lines.drop(1)
             for (line in dataLines) {
                 val cols = line.split(';')
-                // Minimum kolon sayısı (ornek dosyaya göre): 15
-                if (cols.size < 15) {
+
+                if (cols.size < headers.size) {
                     failCount++
                     continue
                 }
 
-                val docId = cols[1].trim()
-                val cins = cols[2].trim()
-                val carpetName = cols[3].trim()
-                val qrText = cols[4].trim()
-                val imageUrlRaw = cols[14].trim()
-
+                val docId = cols[idIndex].trim()
                 if (docId.isBlank()) {
                     failCount++
                     continue
                 }
 
-                val imageUrl = cleanUrl(imageUrlRaw)
+                // 1) CSV başlıkları ile aynı field isimleriyle yaz
+                val data = HashMap<String, Any?>()
+                for (i in headers.indices) {
+                    val key = headers[i]
+                    if (key.isBlank()) continue
+                    if (i >= cols.size) continue
 
-                val data = hashMapOf(
-                    // Mevcut çalışan ekranının okuduğu alanlar
-                    "code" to docId,
-                    "name" to carpetName,
-                    "model" to "",
-                    "patternNo" to "",
-                    "imageUrl" to imageUrl,
-                    // CSV'den ekstra alanlar
-                    "cins" to cins,
-                    "qrText" to qrText
-                )
+                    var value: String = cols[i].trim()
+                    if (key == "IMAGE_URL") {
+                        value = cleanUrl(value)
+                    }
+                    // boş hücreleri null yaparak Firestore'u şişirmeyelim
+                    data[key] = value.ifBlank { null }
+                }
+
+                // 2) Uyumluluk alanları (çalışan ekranı için)
+                val carpetName = (data["CARPET_NAME"] as? String).orEmpty()
+                val kalite = (data["KALITE"] as? String).orEmpty()
+                val desen = (data["DESEN"] as? String).orEmpty()
+                val imageUrl = (data["IMAGE_URL"] as? String).orEmpty()
+
+                data["code"] = docId
+                data["name"] = carpetName
+                data["model"] = kalite
+                data["patternNo"] = desen
+                data["imageUrl"] = imageUrl
 
                 val ref = db.collection("carpets").document(docId)
                 batch.set(ref, data, SetOptions.merge())
-                inBatch++
-
-                if (inBatch >= 450) {
-                    commitBatch {
-                        batch = db.batch()
-                        inBatch = 0
-                    }
-                }
-
                 successCount++
             }
 
-            commitBatch {
-                txtStatus.text = "Yüklendi. Başarılı: $successCount, Hatalı: $failCount"
-            }
+            batch.commit()
+                .addOnSuccessListener {
+                    txtStatus.text = "Yüklendi. Başarılı: $successCount, Hatalı: $failCount"
+                }
+                .addOnFailureListener { e ->
+                    Log.e("CarpetQR", "Batch commit failed", e)
+                    txtStatus.text = "Yükleme hatası: ${e.message}"
+                }
 
         } catch (e: Exception) {
             Log.e("CarpetQR", "CSV import failed", e)

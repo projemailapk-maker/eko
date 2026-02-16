@@ -2,4 +2,11 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <color name="carpet_green">#FF2E7D32</color>
+    <color name="carpet_green_dark">#FF1B5E20</color>
+    <color name="carpet_green_container">#FFE8F5E9</color>
+    <color name="carpet_bg">#FFF7F9FA</color>
+    <color name="carpet_text">#FF0F172A</color>
+    <color name="carpet_muted">#FF64748B</color>
 </resources>
